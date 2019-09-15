@@ -1,0 +1,118 @@
+#include <ESP8266WiFi.h>
+#include "DHT.h"
+#include <DHT_U.h>
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
+#define WLAN_SSID       "Yadav" //Wi-Fi name
+#define WLAN_PASS       "santhimohan"  //Wi-Fi password 
+#define AIO_SERVER      "io.adafruit.com"
+#define AIO_SERVERPORT  1883                   
+#define AIO_USERNAME    "vasudha"
+#define AIO_KEY         "d4dc5b5b1bf24ecaaa628a02f7be8de4"
+int sensor=2;
+#define DHTTYPE DHT11
+DHT dht(sensor,DHTTYPE);
+WiFiClient client;
+WiFiServer server(80);
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
+Adafruit_MQTT_Publish photocell = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pollutionval");
+void MQTT_connect();
+void setup() 
+{
+  Serial.begin(115200);
+  delay(10);
+  pinMode(sensor,INPUT);
+  Serial.println(F("Adafruit MQTT demo"));
+  Serial.println(); Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(WLAN_SSID);
+  WiFi.begin(WLAN_SSID, WLAN_PASS);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  server.begin();
+  Serial.println();
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+               void loop()
+{
+  MQTT_connect();
+  WiFiClient client1=server.available(); 
+  int gas=analogRead(A0);
+  Serial.print("Pollution Level=");
+  Serial.println(gas);
+  /*int temp_value=dht.readTemperature();
+  Serial.print("Temperature=");
+  Serial.println(temp_value); 
+  int hum=dht.readHumidity();
+  Serial.print("Humidity=");
+  Serial.println(hum);*/
+  char str[50];
+  sprintf(str, "%d", gas);
+   client1.println("HTTP/1.1 200 OK"); 
+  client1.println("Content-Type: text/html"); 
+  client1.println("Connection:close"); 
+  client1.println();
+  client1.println("<!DOCTYPE HTML>"); 
+  client1.println("<html>"); 
+  client1.println("<head>"); 
+  client1.println("<meta http-equiv='refresh' content='5;  URL=http://10.42.0.22/'>");
+client1.println("<metaname='apple-mobile-web-app-capable' http-equiv='refresh' content='5'/>"); 
+client1.println("<metaname='apple-mobile-web-app-status-bar style'content='blacktranslucent' />");
+ client1.println("</head>"); 
+ client1.println("<body>");  
+ client1.println("<body bgcolor = \"#e6eff7\">");
+ client1.println("<h1><center>ATMOSPHERE MONITORING SYSTEM</center></h1>");   
+client1.println("<br><br>");    
+client1.println("<center>"); 
+client1.println("<font color='blue'>");  
+  if (!photocell.publish(str)) 
+  {
+    Serial.println(F("Failed"));
+  } 
+  else
+  {
+    Serial.println(F("Data Sent to the Server Successfully")); 
+  /*  client1.println("<h1>temperature(in degree C)="); 
+    client1.println(temp_value); 
+    client1.println("</h1>"); */
+    client1.println("<h1>Pollution Level(in ppm)="); 
+    client1.println(gas); 
+    client1.println("</h1>"); 
+    client1.println("sent to cloud successfully");
+    delay(1000); 
+   client1.println("</font>"); 
+   client1.println("</center>"); 
+  client1.println("</body>"); 
+  client1.println("</html>");
+
+  }
+  delay(1000);
+}
+void MQTT_connect() 
+{
+  int8_t ret;
+  if (mqtt.connected())
+  {
+    return;
+  }
+  Serial.print("Connecting to MQTT... ");
+  uint8_t retries = 3;
+  while ((ret = mqtt.connect()) != 0)
+  { 
+       Serial.println(mqtt.connectErrorString(ret));
+       Serial.println("Retrying MQTT connection in 5 seconds...");
+       mqtt.disconnect();
+       delay(5000);
+       retries--;
+       if (retries == 0)
+       {
+         while (1);
+       }
+  }
+  Serial.println("MQTT Connected!");
+}
